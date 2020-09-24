@@ -1,0 +1,236 @@
+---
+title: "Sales Analytics"
+author: "Fayez Alshehri"
+date: "9/24/2020"
+output:
+  
+  rmdformats::readthedown:
+  html_document: 
+    
+    theme: rmdformats::material
+  pdf_document: default
+---
+```{r setup, include=FALSE, cache=FALSE, results=FALSE, warning=FALSE, comment=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+```{r, echo=FALSE,include=FALSE, cache=FALSE, results=FALSE, warning=FALSE, comment=FALSE, warning=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(wesanderson)
+library(ggthemes)
+library(plotly)
+library(rmarkdown)
+library("readxl")
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+library(lubridate)
+
+
+Apr <- read_excel('test.xlsx',sheet = 'Apr',col_names=TRUE)
+
+
+
+Apr[1,1] <- 'Model'
+colnames(Apr) <- Apr[1,]
+Apr <- Apr[-1,]
+long_apr <- t(Apr)
+long_apr <- as.data.frame(long_apr)
+colnames(long_apr) <- long_apr[1,]
+long_apr <- long_apr[-1,]
+long_apr <- sapply( long_apr, as.numeric )
+long_apr <- as.data.frame(long_apr)
+
+Apr_wide <- Apr
+Apr <- long_apr
+
+Apr <- data.frame(Date = row.names(Apr), Apr)
+Apr <- gather(Apr, "Model", "Quantity", -Date)
+Apr$Date <- as.numeric(Apr$Date)
+### March Data
+
+Mar <- read_excel('test.xlsx',sheet = 'Mar')
+
+Mar <- Mar[,1:9]
+
+colnames(Mar)<- c("Region","Channel","Name","AA","BB","CC","DD","EE","FF")
+Mar <- Mar[-1,]
+
+Mar$AA <- as.numeric(Mar$AA)
+Mar$BB <- as.numeric(Mar$BB)
+Mar$CC <- as.numeric(Mar$CC)
+Mar$DD <- as.numeric(Mar$DD)
+Mar$EE <- as.numeric(Mar$EE)
+Mar$FF <- as.numeric(Mar$FF)
+
+Mar[is.na(Mar)] <- 0 
+
+### Feb Data 
+
+Feb <- read_excel('test.xlsx',sheet = 'Feb')
+
+Feb <- Feb[,1:9]
+
+colnames(Feb)<- c("Region","Channel","Name","AA","BB","CC","DD","EE","FF")
+Feb <- Feb[-1,]
+
+Feb$AA <- as.numeric(Feb$AA)
+Feb$BB <- as.numeric(Feb$BB)
+Feb$CC <- as.numeric(Feb$CC)
+Feb$DD <- as.numeric(Feb$DD)
+Feb$EE <- as.numeric(Feb$EE)
+Feb$FF <- as.numeric(Feb$FF)
+
+Feb[is.na(Feb)] <- 0 
+
+#### Jan
+
+Jan <- read_excel('test.xlsx',sheet = 'Jan')
+
+Jan <- Jan[,1:9]
+
+colnames(Jan)<- c("Region","Channel","Name","AA","BB","CC","DD","EE","FF")
+Jan <- Jan[-1,]
+
+Jan$AA <- as.numeric(Jan$AA)
+Jan$BB <- as.numeric(Jan$BB)
+Jan$CC <- as.numeric(Jan$CC)
+Jan$DD <- as.numeric(Jan$DD)
+Jan$EE <- as.numeric(Jan$EE)
+Jan$FF <- as.numeric(Jan$FF)
+
+Jan[is.na(Jan)] <- 0 
+
+
+
+############ Gather And Combine
+Jan <- gather(Jan, "Model", "Quantity", -Region,-Channel,-Name)
+Jan$Month <- "Jan"
+Feb <- gather(Feb, "Model", "Quantity", -Region,-Channel,-Name)
+Feb$Month <- "Feb"
+Mar <- gather(Mar, "Model", "Quantity", -Region,-Channel,-Name)
+Mar$Month <- "Mar"
+df <- rbind(Jan,Feb,Mar)
+
+df$Through <- 0
+df$Price <- 0
+
+df[df$Month=="Jan",]$Through <- 10
+df[df$Month=="Feb",]$Through <- 30
+df[df$Month=="Mar",]$Through <- 10
+
+df[df$Model=="AA",]$Price <- 1
+df[df$Model=="BB",]$Price <- 2
+df[df$Model=="CC",]$Price <- 3
+df[df$Model=="DD",]$Price <- 4
+df[df$Model=="EE",]$Price <- 5
+df[df$Model=="FF",]$Price <- 6
+
+df <- df[,c(6,1,2,3,4,5,7,8)]
+
+```
+
+## Intro{.tabset .tabset-fade}
+
+As part of Vivo Data Analytics screening, I was handed an simulated Excel Data and was challenged to provide Sales Insight, the Data consist of 2 main tables, first is a time series of April Sales, the second is sales summary of multiple products through different distributed channels. 
+
+A look at the data after being processed for our analysis
+
+
+
+### April TimeSeries
+```{r, layout="l-body-outset",echo=FALSE,message=FALSE,warning=FALSE}
+library(rmarkdown)
+paged_table(Apr)
+```
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+### First Quarter
+```{r, layout="l-body-outset",echo=FALSE,message=FALSE,warning=FALSE}
+paged_table(df)
+```
+
+
+
+
+
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+
+## April Analysis
+
+As we can see from the chart bellow, sales was higher at the beginning of April and during the last 2 days. FF Model accounted for 38% of Total Sales
+```{r echo=FALSE}
+AprTrends <- Apr %>% ggplot(aes(x=Date,y=Quantity,color=Model)) + geom_line()
+
+ggplotly(AprTrends)
+```
+
+```{r ,echo=FALSE, message=FALSE,warning=FALSE}
+
+dougnot <- Apr %>% group_by(Model) %>% summarise(Quantity=sum(Quantity)) %>%  mutate(Percentage = (Quantity/sum(Quantity) * 100))
+  
+
+dougnot$ymax = cumsum(dougnot$Percentage)
+
+# Compute the bottom of each rectangle
+dougnot$ymin = c(0, head(dougnot$ymax, n=-1))
+dougnot$labelPosition <- (dougnot$ymax + dougnot$ymin) / 2
+dougnot$label <- paste0(dougnot$Model, "\n Percentage: %", round(dougnot$Percentage,3))
+# Make the plot
+ggplot(dougnot, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=Model)) +
+  geom_rect() +
+  geom_label( x=3.5, aes(y=labelPosition, label=label), size=6) +
+  coord_polar(theta="y") +
+  xlim(c(2, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+
+
+
+
+```
+
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
+## First Quarter
+
+
+The Bar-Graph bellow shows the total quantity sold for each Model in the first Quarter, Febraury Had a huge spike in the sold quantities which positively correlates with Sales-Through of 30 per Model.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+
+
+
+
+
+df$Month <- factor(df$Month,levels = c("Jan", "Feb", "Mar"))
+
+monthly <- df %>% group_by(Month,Model) %>% summarise(Sum = sum(Quantity)) %>%
+  ggplot(aes(x=Month,y=Sum,fill=Model)) + geom_col()
+
+ggplotly(monthly)
+
+```
+
